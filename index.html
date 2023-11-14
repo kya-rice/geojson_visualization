@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en-US">   
+
+<head>
+    <meta charset="utf-8">
+    <title>Earthquake List</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+
+    <!-- Including the Mapbox GL CSS file -->
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.css" rel="stylesheet">
+
+    <!-- Including the Mapbox GL JS file -->
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.js"></script>
+
+    <style>
+        /* CSS styles for the layout and components */
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #container {
+            display: flex;
+            height: 100vh;
+            flex-direction: row;
+            align-items: stretch;
+        }
+
+        #side-panel {
+            flex-basis: 500px;
+            overflow-y: scroll;
+        }
+
+        #map {
+            flex-grow: 1;
+        }
+
+        button {
+            margin-bottom: 10px;
+        }
+
+        table {
+            border-collapse: collapse;
+            border-spacing: 0;
+            width: 100%;
+            border: 1px solid #ddd;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 16px;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        @media (max-width: 1023px) {
+            #side-panel {
+                display: none;
+        }
+    }
+    </style>
+</head>
+
+<body>
+    <main id="container">
+        <div id="side-panel">
+
+            <h2>Historic California Earthquakes 1769 - 2015</h2>
+            <button>Sort by Most Recent Year</button>
+
+            <table>
+                <tr>
+                    <th>Object ID</th>
+                    <th>Magnitude</th>
+                    <th>Month</th>
+                    <th>Day</th>
+                    <th>Year</th>
+                </tr>
+            </table>
+
+        </div>
+        <div id="map"></div>
+
+    </main>
+    <script>
+        // Define the Mapbox access token
+        mapboxgl.accessToken =
+            'pk.eyJ1Ijoia3lhcGFwYXlhMjgiLCJhIjoiY2xveGkwNWNsMDEyczJqczN4NGR6Z3RmcSJ9.J0BGxTM8eFefqISUZcOC-Q';
+
+        // Create the map object
+        let map = new mapboxgl.Map({
+            container: 'map', // container ID
+            style: 'mapbox://styles/mapbox/streets-v12', // style URL
+            zoom: 5, // starting zoom
+            center: [-119.624, 37.058] // starting center
+        });
+
+
+        async function geojsonFetch() {
+
+            let response, california_earthquake, california_counties, table;
+            response = await fetch('assets/california_counties.geojson');
+            california_counties = await response.json();
+            response = await fetch('assets/california_earthquake.geojson');
+            california_earthquake = await response.json();
+
+            table = document.getElementsByTagName("table")[0];
+            let row, cell1, cell2, cell3, cell4;
+            for (let i = 0; i < california_earthquake.features.length; i++) {
+                // Create an empty <tr> element and add it to the 1st position of the table:
+                row = table.insertRow(-1);
+                cell1 = row.insertCell(0);
+                cell2 = row.insertCell(1);
+                cell3 = row.insertCell(2);
+                cell4 = row.insertCell(3);
+                cell5 = row.insertCell(4);
+                cell1.innerHTML = california_earthquake.features[i].properties.OBJECTID_1;
+                cell2.innerHTML = california_earthquake.features[i].properties.magnitude;
+                cell3.innerHTML = california_earthquake.features[i].properties.month;
+                cell4.innerHTML = california_earthquake.features[i].properties.day;
+                cell5.innerHTML = california_earthquake.features[i].properties.year;
+            }
+
+
+            //load data to the map as new layers and table on the side.
+            map.on('load', function loadingData() {
+
+                map.addSource('california_earthquake', {
+                    type: 'geojson',
+                    data: california_earthquake
+                });
+
+                map.addLayer({
+                    'id': 'california_earthquake-layer',
+                    'type': 'circle',
+                    'source': 'california_earthquake',
+                    'paint': {
+                        'circle-radius': 5,
+                        'circle-stroke-width': 1,
+                        'circle-color': 'blue',
+                        'circle-stroke-color': 'blue'
+                    }
+                });
+
+
+                map.addSource('california_counties', {
+                    type: 'geojson',
+                    data: california_counties
+                });
+
+                map.addLayer({
+                    'id': 'california_counties-layer',
+                    'type': 'fill',
+                    'source': 'california_counties',
+                    'paint': {
+                        'fill-color': 'purple', // blue color fill
+                        'fill-opacity': 0.60
+                    }
+                });
+
+            });
+
+        }
+
+        geojsonFetch();
+
+        let btn = document.getElementsByTagName("button")[0];
+
+        btn.addEventListener('click', sortTable);
+
+        // define the function to sort table
+        function sortTable(e) {
+            let table, rows, switching, i, x, y, shouldSwitch;
+            table = document.getElementsByTagName("table")[0];
+            switching = true;
+            /*Make a loop that will continue until
+            no switching has been done:*/
+            while (switching) {
+                //start by saying: no switching is done:
+                switching = false;
+                rows = table.rows;
+                /*Loop through all table rows (except the
+                first, which contains table headers):*/
+                for (i = 1; i < (rows.length - 1); i++) {
+                    //start by saying there should be no switching:
+                    shouldSwitch = false;
+                    /*Get the two elements you want to compare,
+                    one from current row and one from the next:*/
+                    x = parseFloat(rows[i].getElementsByTagName("td")[4].innerHTML);
+                    y = parseFloat(rows[i + 1].getElementsByTagName("td")[4].innerHTML);
+                    //check if the two rows should switch place:
+                    if (x < y) {
+                        //if so, mark as a switch and break the loop:
+                        shouldSwitch = true;
+                        break;
+                    }
+                }
+                if (shouldSwitch) {
+                    /*If a switch has been marked, make the switch
+                    and mark that a switch has been done:*/
+                    rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                    switching = true;
+                }
+            }
+        }
+    </script>
+
+</body>
+
+</html>
